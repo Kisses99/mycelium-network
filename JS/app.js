@@ -22,7 +22,11 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let mouseX = 0, mouseY = 0;
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+function resize() {
+  const vv = window.visualViewport;
+  canvas.width  = vv ? Math.round(vv.width)  : window.innerWidth;
+  canvas.height = vv ? Math.round(vv.height) : window.innerHeight;
+}
 resize();
 
 // ─── Level Config ─────────────────────────────────────────────────────────────
@@ -680,8 +684,34 @@ function render() {
 // ─── Input ────────────────────────────────────────────────────────────────────
 function hitNode(px, py, node) {
   const dx = px - node.x, dy = py - node.y;
-  const r = Math.max(node.r * 2.2, 18);
+  // Larger hit radius on touch devices for fat-finger friendliness
+  const r = Math.max(node.r * 2.5, 22);
   return dx * dx + dy * dy <= r * r;
+}
+
+/**
+ * Convert a MouseEvent/PointerEvent to canvas-space coordinates.
+ * Applies the canvas.width/rect.width scale so hit-tests stay accurate
+ * even when CSS display size differs from the canvas pixel size.
+ */
+function canvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width  / rect.width),
+    y: (e.clientY - rect.top)  * (canvas.height / rect.height),
+  };
+}
+
+/**
+ * Same as canvasPos but for a Touch object.
+ * Uses changedTouches-compatible Touch interface (clientX/clientY).
+ */
+function touchPos(touch) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (touch.clientX - rect.left) * (canvas.width  / rect.width),
+    y: (touch.clientY - rect.top)  * (canvas.height / rect.height),
+  };
 }
 
 canvas.addEventListener('mousemove', (e) => {
@@ -701,7 +731,6 @@ canvas.addEventListener('click', (e) => {
   const { x, y } = canvasPos(e);
   const btn = hitBtn(x, y);
   if (btn) { btn.fn(); return; }
-
   if (screen === 'playing' && gamePhase === 'playing') {
     for (const node of nodes) {
       if (hitNode(x, y, node)) { doPlayerMove(node.id); break; }
@@ -711,34 +740,44 @@ canvas.addEventListener('click', (e) => {
 
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
-  const t = e.touches[0];
-  mouseX = t.clientX; mouseY = t.clientY;
+  const pos = touchPos(e.touches[0]);
+  mouseX = pos.x; mouseY = pos.y;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const pos = touchPos(e.touches[0]);
+  mouseX = pos.x; mouseY = pos.y;
 }, { passive: false });
 
 canvas.addEventListener('touchend', (e) => {
   e.preventDefault();
-  const { x, y } = { x: mouseX, y: mouseY };
-  const btn = hitBtn(x, y);
+  // changedTouches[0] is the finger that was just lifted — always valid on touchend
+  const pos = touchPos(e.changedTouches[0]);
+  const btn = hitBtn(pos.x, pos.y);
   if (btn) { btn.fn(); return; }
   if (screen === 'playing' && gamePhase === 'playing') {
     for (const node of nodes) {
-      if (hitNode(x, y, node)) { doPlayerMove(node.id); break; }
+      if (hitNode(pos.x, pos.y, node)) { doPlayerMove(node.id); break; }
     }
   }
 }, { passive: false });
 
-function canvasPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-}
-
 // ─── Resize ───────────────────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
+function onResize() {
   resize();
   initLevel(currentLevelIdx);
   if (screen === 'playing' || screen === 'gameover') screen = 'level-intro';
   if (screen === 'tutorial-card') tutorialCardIdx = 0;
-});
+}
+
+window.addEventListener('resize', onResize);
+
+// visualViewport tracks the true visible area on mobile (excludes browser chrome,
+// on-screen keyboard, etc.) without triggering a full-page resize event.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', onResize);
+}
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 function initApp() {
