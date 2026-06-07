@@ -113,8 +113,11 @@ const AI_THINK_MS = 680;
 
 // ─── Button Registry (rebuilt each frame) ────────────────────────────────────
 let _btns = [];
+const BTN_PAD = 14; // invisible touch padding around every button
 function clearBtns() { _btns = []; }
-function regBtn(x, y, w, h, fn) { _btns.push({ x, y, w, h, fn }); }
+function regBtn(x, y, w, h, fn) {
+  _btns.push({ x: x - BTN_PAD, y: y - BTN_PAD, w: w + BTN_PAD * 2, h: h + BTN_PAD * 2, fn });
+}
 function hitBtn(x, y) { return _btns.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h); }
 
 // ─── Level Lifecycle ──────────────────────────────────────────────────────────
@@ -686,8 +689,7 @@ function render() {
 // ─── Input ────────────────────────────────────────────────────────────────────
 function hitNode(px, py, node) {
   const dx = px - node.x, dy = py - node.y;
-  // Larger hit radius on touch devices for fat-finger friendliness
-  const r = Math.max(node.r * 2.5, 22);
+  const r = Math.max(node.r * 3.5, 30);
   return dx * dx + dy * dy <= r * r;
 }
 
