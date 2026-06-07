@@ -23,9 +23,11 @@ const ctx = canvas.getContext('2d');
 let mouseX = 0, mouseY = 0;
 
 function resize() {
-  const vv = window.visualViewport;
-  canvas.width  = vv ? Math.round(vv.width)  : window.innerWidth;
-  canvas.height = vv ? Math.round(vv.height) : window.innerHeight;
+  // clientWidth/clientHeight is the actual CSS-rendered size of the element.
+  // Syncing canvas pixels to it guarantees scale = 1, so touch coords are
+  // never offset by a vh-vs-innerHeight mismatch on mobile.
+  canvas.width  = canvas.clientWidth  || window.innerWidth;
+  canvas.height = canvas.clientHeight || window.innerHeight;
 }
 resize();
 
@@ -772,12 +774,6 @@ function onResize() {
 }
 
 window.addEventListener('resize', onResize);
-
-// visualViewport tracks the true visible area on mobile (excludes browser chrome,
-// on-screen keyboard, etc.) without triggering a full-page resize event.
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', onResize);
-}
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 function initApp() {
